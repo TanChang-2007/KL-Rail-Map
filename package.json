@@ -1,0 +1,10 @@
+{
+  "name": "kl-path-guide",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first Klang Valley rail route guide for KL Path Guide.",
+  "scripts": {
+    "start": "python -m http.server 5173",
+    "serve": "python -m http.server 5173"
+  }
+}

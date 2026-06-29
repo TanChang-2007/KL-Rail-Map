@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="KL Path Guide helps people plan rail-first journeys around Kuala Lumpur and Klang Valley."
+    />
+    <title>KL Path Guide</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" data-i18n="network">Klang Valley Rail</p>
+          <h1>KL Path Guide</h1>
+        </div>
+        <button class="lang-toggle" id="langToggle" type="button">中文</button>
+      </header>
+
+      <main>
+        <section class="planner" aria-labelledby="plannerTitle">
+          <div class="planner-head">
+            <div>
+              <h2 id="plannerTitle" data-i18n="plannerTitle">Where are you going?</h2>
+              <p data-i18n="plannerSubtitle">Plan with rail first, then use Grab only for the first or last stretch.</p>
+            </div>
+            <button class="icon-button" id="locateBtn" type="button" title="Use current location" aria-label="Use current location">
+              <span>⌖</span>
+            </button>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              <span data-i18n="from">From</span>
+              <input id="fromInput" list="stationList" autocomplete="off" placeholder="Current location or station" />
+            </label>
+            <button class="swap-button" id="swapBtn" type="button" title="Swap route" aria-label="Swap route">⇅</button>
+            <label>
+              <span data-i18n="to">To</span>
+              <input id="toInput" list="stationList" autocomplete="off" placeholder="Bukit Bintang, KLCC, KLIA..." />
+            </label>
+          </div>
+
+          <datalist id="stationList"></datalist>
+
+          <div class="actions">
+            <button class="primary" id="routeBtn" type="button" data-i18n="findRoute">Find best route</button>
+            <button class="secondary" id="nearbyBtn" type="button" data-i18n="nearby">Nearby stations</button>
+          </div>
+          <p class="status" id="statusText" role="status"></p>
+        </section>
+
+        <section class="results" id="results" aria-live="polite"></section>
+
+        <section class="rail-lines" aria-labelledby="linesTitle">
+          <div class="section-head">
+            <h2 id="linesTitle" data-i18n="includedLines">Included rail lines</h2>
+            <p data-i18n="starterData">Starter data, ready for expansion.</p>
+          </div>
+          <div class="update-status" id="updateStatus" role="status"></div>
+          <div class="line-grid" id="lineGrid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
