@@ -27,20 +27,23 @@
               <h2 id="plannerTitle" data-i18n="plannerTitle">Where are you going?</h2>
               <p data-i18n="plannerSubtitle">Plan with rail first, then use Grab only for the first or last stretch.</p>
             </div>
-            <button class="icon-button" id="locateBtn" type="button" title="Use current location" aria-label="Use current location">
+            <button class="icon-button locate-button" id="locateBtn" type="button" title="Use current location" aria-label="Use current location">
               <span>⌖</span>
+              <span class="locate-label" data-i18n="useLocation">Use location</span>
             </button>
           </div>
 
           <div class="form-grid">
             <label>
               <span data-i18n="from">From</span>
-              <input id="fromInput" list="stationList" autocomplete="off" placeholder="Current location or station" />
+              <input id="fromInput" autocomplete="off" placeholder="Current location or station" />
+              <div class="suggestions" id="fromSuggestions" role="listbox"></div>
             </label>
             <button class="swap-button" id="swapBtn" type="button" title="Swap route" aria-label="Swap route">⇅</button>
             <label>
               <span data-i18n="to">To</span>
-              <input id="toInput" list="stationList" autocomplete="off" placeholder="Bukit Bintang, KLCC, KLIA..." />
+              <input id="toInput" autocomplete="off" placeholder="Bukit Bintang, KLCC, KLIA..." />
+              <div class="suggestions" id="toSuggestions" role="listbox"></div>
             </label>
           </div>
 

@@ -127,6 +127,20 @@ h2 {
   cursor: pointer;
 }
 
+.locate-button {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  width: auto;
+  min-width: 44px;
+  padding: 0 12px;
+  gap: 6px;
+}
+
+.locate-label {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 44px 1fr;
@@ -143,6 +157,10 @@ label span {
   font-weight: 800;
 }
 
+label {
+  position: relative;
+}
+
 input {
   width: 100%;
   min-height: 52px;
@@ -151,6 +169,46 @@ input {
   padding: 0 14px;
   color: var(--ink);
   background: #fbfcfe;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  display: none;
+  width: 100%;
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(31, 45, 61, 0.16);
+}
+
+.suggestions.is-open {
+  display: grid;
+}
+
+.suggestion-item {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px solid #edf1f6;
+  border-radius: 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion-item:last-child {
+  border-bottom: 0;
+}
+
+.suggestion-item:hover,
+.suggestion-item:focus-visible {
+  background: #f3f8f9;
 }
 
 input:focus,
@@ -370,5 +428,9 @@ button:focus-visible {
 
   .actions button {
     width: 100%;
+  }
+
+  .locate-label {
+    display: none;
   }
 }

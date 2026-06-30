@@ -7,6 +7,7 @@ const i18n = {
     to: "To",
     findRoute: "Find best route",
     nearby: "Nearby stations",
+    useLocation: "Use location",
     includedLines: "Included rail lines",
     starterData: "Updated from the Klang Valley Integrated Transit Map dated 11/06/2026.",
     routeFound: "Best rail route",
@@ -25,6 +26,11 @@ const i18n = {
     chooseStations: "Choose a starting point and destination.",
     locationReady: "Location found. Nearby stations are shown below.",
     locationUnavailable: "Location is unavailable. You can still type a station.",
+    locationFinding: "Finding your location...",
+    locationDenied: "Location permission is blocked for this site. Allow location in your browser site settings, then try again. You can also type a station manually.",
+    locationTimeout: "Location took too long. Turn on GPS/location services and try again.",
+    locationSecure: "Location only works on HTTPS. Open the Vercel link directly in Safari or Chrome.",
+    nearbyNeedsLocation: "Nearby stations need your phone location. If permission is blocked, type your starting station instead.",
     nearbyTitle: "Nearby stations",
     kmAway: "km away",
     liveNote: "Live arrivals and disruptions are prepared as an upgrade when an official data feed is available.",
@@ -44,6 +50,7 @@ const i18n = {
     to: "目的地",
     findRoute: "寻找最佳路线",
     nearby: "附近车站",
+    useLocation: "使用位置",
     includedLines: "已包含路线",
     starterData: "已根据 2026/06/11 巴生谷综合交通图更新。",
     routeFound: "最佳铁路路线",
@@ -62,6 +69,10 @@ const i18n = {
     chooseStations: "请选择出发站和目的站。",
     locationReady: "已找到位置。附近车站显示在下方。",
     locationUnavailable: "无法取得位置。你仍然可以输入车站。",
+    locationFinding: "正在寻找你的位置...",
+    locationDenied: "位置权限已被封锁。请在手机浏览器设置中允许此网站使用位置，然后再试一次。",
+    locationTimeout: "定位时间太久。请开启手机 GPS/定位服务后再试一次。",
+    locationSecure: "定位只支援 HTTPS。请直接用 Safari 或 Chrome 打开 Vercel 链接。",
     nearbyTitle: "附近车站",
     kmAway: "公里",
     liveNote: "实时到站和故障资讯会在取得官方数据源后升级。",
@@ -196,6 +207,8 @@ const els = {
   swapBtn: document.querySelector("#swapBtn"),
   fromInput: document.querySelector("#fromInput"),
   toInput: document.querySelector("#toInput"),
+  fromSuggestions: document.querySelector("#fromSuggestions"),
+  toSuggestions: document.querySelector("#toSuggestions"),
   stationList: document.querySelector("#stationList"),
   results: document.querySelector("#results"),
   lineGrid: document.querySelector("#lineGrid"),
@@ -256,10 +269,58 @@ function renderText() {
   renderCachedUpdateStatus();
 }
 
+function isCurrentLocationValue(value) {
+  const normalized = value.trim().toLowerCase();
+  return !normalized || normalized === "current location" || normalized === "当前位置";
+}
+
 function renderStationOptions() {
   els.stationList.innerHTML = stations
     .map((station) => `<option value="${stationName(station)}"></option><option value="${station.name}"></option>`)
     .join("");
+}
+
+function stationSearchText(station) {
+  return `${station.name} ${station.zh} ${nearbyStationName(station)} ${station.lines.map(lineName).join(" ")}`.toLowerCase();
+}
+
+function suggestionLabel(station) {
+  const services = stationServiceTypes(station).join("/") || "Rail";
+  return `${station.name} ${services} Station`;
+}
+
+function matchingStations(query) {
+  const normalized = query.trim().toLowerCase();
+  const featured = ["kl-sentral", "klcc", "bukit-bintang", "pasar-seni", "masjid-jamek", "trx", "salak-tinggi", "usj7"];
+  const source = normalized
+    ? stations.filter((station) => stationSearchText(station).includes(normalized))
+    : featured.map((id) => stationById[id]).filter(Boolean);
+  return source.slice(0, 8);
+}
+
+function closeSuggestions() {
+  els.fromSuggestions?.classList.remove("is-open");
+  els.toSuggestions?.classList.remove("is-open");
+}
+
+function renderSuggestions(input, panel) {
+  if (!panel) return;
+  const matches = matchingStations(input.value);
+  panel.innerHTML = matches
+    .map((station) => `<button class="suggestion-item" type="button" data-station-id="${station.id}" role="option">${suggestionLabel(station)}</button>`)
+    .join("");
+  panel.classList.toggle("is-open", matches.length > 0);
+}
+
+function bindStationSuggestions(input, panel) {
+  input.addEventListener("input", () => renderSuggestions(input, panel));
+  input.addEventListener("focus", () => renderSuggestions(input, panel));
+  panel?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-station-id]");
+    if (!button) return;
+    input.value = stationName(stationById[button.dataset.stationId]);
+    closeSuggestions();
+  });
 }
 
 function renderLines() {
@@ -441,7 +502,12 @@ function estimateFare(legs) {
   return `RM ${fare.toFixed(2)}`;
 }
 
-function renderRoute() {
+async function renderRoute() {
+  if (isCurrentLocationValue(els.fromInput.value) && !userLocation) {
+    const located = await requestUserLocation({ showNearby: false });
+    if (!located) return;
+  }
+
   const fromStation = findStation(els.fromInput.value) || nearestStation(userLocation);
   const toStation = findStation(els.toInput.value);
   els.statusText.textContent = "";
@@ -533,8 +599,14 @@ function nearestStation(location) {
     .sort((a, b) => distanceKm(location, a) - distanceKm(location, b))[0];
 }
 
-function renderNearby() {
-  const origin = userLocation || { lat: 3.1478, lng: 101.6953 };
+function renderNearbyList() {
+  if (!userLocation) {
+    els.results.innerHTML = "";
+    els.statusText.textContent = t("nearbyNeedsLocation");
+    return;
+  }
+
+  const origin = userLocation;
   const nearby = [...stations]
     .filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lng))
     .map((station) => ({ ...station, distance: distanceKm(origin, station) }))
@@ -559,33 +631,83 @@ function renderNearby() {
   `;
 }
 
+async function renderNearby() {
+  if (!userLocation) {
+    const located = await requestUserLocation({ showNearby: false });
+    if (!located) {
+      els.results.innerHTML = "";
+      if (!els.statusText.textContent) els.statusText.textContent = t("nearbyNeedsLocation");
+      return;
+    }
+  }
+  renderNearbyList();
+}
+
 els.langToggle.addEventListener("click", () => {
   currentLang = currentLang === "en" ? "zh" : "en";
   renderText();
   els.results.innerHTML = "";
 });
 
-els.locateBtn.addEventListener("click", () => {
+function getPhonePosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+async function requestUserLocation(options = {}) {
+  const { showNearby = true } = options;
   if (!navigator.geolocation) {
     els.statusText.textContent = t("locationUnavailable");
-    return;
+    return false;
   }
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-      const station = nearestStation(userLocation);
-      els.fromInput.value = stationName(station);
-      els.statusText.textContent = t("locationReady");
-      renderNearby();
-    },
-    () => {
+  if (!window.isSecureContext) {
+    els.statusText.textContent = t("locationSecure");
+    return false;
+  }
+
+  els.statusText.textContent = t("locationFinding");
+  try {
+    let position;
+    try {
+      position = await getPhonePosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+    } catch (firstError) {
+      if (firstError.code === firstError.PERMISSION_DENIED) throw firstError;
+      position = await getPhonePosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    }
+
+    userLocation = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude
+    };
+    const station = nearestStation(userLocation);
+    els.fromInput.value = stationName(station);
+    els.statusText.textContent = t("locationReady");
+    if (showNearby) renderNearbyList();
+    return true;
+  } catch (error) {
+    userLocation = null;
+    els.results.innerHTML = "";
+    if (error.code === error.PERMISSION_DENIED) {
+      els.statusText.textContent = t("locationDenied");
+    } else if (error.code === error.TIMEOUT) {
+      els.statusText.textContent = t("locationTimeout");
+    } else {
       els.statusText.textContent = t("locationUnavailable");
-    },
-    { enableHighAccuracy: true, timeout: 9000 }
-  );
+    }
+    return false;
+  }
+}
+
+els.locateBtn.addEventListener("click", () => {
+  requestUserLocation();
+});
+
+bindStationSuggestions(els.fromInput, els.fromSuggestions);
+bindStationSuggestions(els.toInput, els.toSuggestions);
+document.addEventListener("click", (event) => {
+  if (event.target.closest("label")) return;
+  closeSuggestions();
 });
 
 els.routeBtn.addEventListener("click", renderRoute);
