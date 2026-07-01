@@ -288,6 +288,112 @@ button:focus-visible {
   display: none;
 }
 
+.journey-view {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 0;
+  min-height: calc(100vh - 120px);
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(215, 222, 232, 0.85);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.journey-view[hidden] {
+  display: none;
+}
+
+.journey-view.map-links {
+  display: block;
+}
+
+.journey-view.map-links .journey-map,
+.journey-view.map-links .journey-controls {
+  display: none;
+}
+
+.journey-view.map-links .journey-panel {
+  max-height: none;
+  border-width: 0;
+}
+
+.journey-map {
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+}
+
+.journey-panel {
+  width: 100%;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-width: 0 1px 0 0;
+  border-radius: 0;
+  padding: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.journey-head,
+.journey-controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.journey-controls {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.journey-steps {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.journey-step {
+  border-left: 5px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.journey-step strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.map-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--accent-strong);
+  background: #fff;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.map-link:hover {
+  border-color: var(--accent);
+  background: #f3f8f9;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -428,6 +534,23 @@ button:focus-visible {
 
   .actions button {
     width: 100%;
+  }
+
+  .journey-view {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .journey-map {
+    min-height: 54vh;
+    order: 1;
+  }
+
+  .journey-panel {
+    order: 2;
+    max-height: none;
+    padding: 12px;
+    border-width: 1px 0 0;
   }
 
   .locate-label {

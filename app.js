@@ -11,6 +11,18 @@ const i18n = {
     includedLines: "Included rail lines",
     starterData: "Updated from the Klang Valley Integrated Transit Map dated 11/06/2026.",
     routeFound: "Best rail route",
+    startJourney: "Jump to map",
+    liveJourney: "Map navigation",
+    backToPlanner: "Back",
+    recenter: "Recenter",
+    mapUnavailable: "Map library is unavailable. Check your internet connection and reload.",
+    mapNeedsRoute: "Find a route first, then start the journey.",
+    mapOpenHint: "Open each segment in your preferred navigation app. Waze is best for car/Grab-style navigation to a station.",
+    openGoogleMaps: "Google Maps",
+    openAppleMaps: "Apple Maps",
+    openWaze: "Waze",
+    liveTracking: "Live location is on. Follow the blue dot as you move.",
+    liveTrackingUnavailable: "Live location is unavailable. The route map is still shown.",
     transfers: "Transfers",
     estimatedFare: "Estimated fare",
     duration: "Duration",
@@ -211,10 +223,25 @@ const els = {
   toSuggestions: document.querySelector("#toSuggestions"),
   stationList: document.querySelector("#stationList"),
   results: document.querySelector("#results"),
+  journeyView: document.querySelector("#journeyView"),
+  journeyTitle: document.querySelector("#journeyTitle"),
+  journeyMap: document.querySelector("#journeyMap"),
+  journeyStatus: document.querySelector("#journeyStatus"),
+  journeySteps: document.querySelector("#journeySteps"),
+  backToPlannerBtn: document.querySelector("#backToPlannerBtn"),
+  recenterBtn: document.querySelector("#recenterBtn"),
   lineGrid: document.querySelector("#lineGrid"),
   updateStatus: document.querySelector("#updateStatus"),
   statusText: document.querySelector("#statusText")
 };
+
+let currentJourney = null;
+let journeyMap = null;
+let routeLayer = null;
+let liveMarker = null;
+let stationLayer = null;
+let liveWatchId = null;
+let journeyBounds = null;
 
 function t(key) {
   return i18n[currentLang][key] || i18n.en[key] || key;
@@ -527,6 +554,7 @@ async function renderRoute() {
   const transfers = Math.max(0, grouped.length - 1);
   const duration = legs.reduce((sum, leg) => sum + lineById[leg.lineId].speed, 0) + transfers * 5;
   const grabUrl = `https://grab.onelink.me/2695613898?pid=KLPathGuide&c=${encodeURIComponent(toStation.name)}`;
+  currentJourney = { fromStation, toStation, legs, grouped, duration, transfers };
 
   els.results.innerHTML = `
     <div class="route-summary">
@@ -534,7 +562,10 @@ async function renderRoute() {
         <h2>${t("routeFound")}</h2>
         <p>${stationName(fromStation)} → ${stationName(toStation)}</p>
       </div>
-      <a class="grab-link" href="${grabUrl}" target="_blank" rel="noreferrer">${t("openGrab")}</a>
+      <div class="actions">
+        <button class="primary" id="startJourneyBtn" type="button">${t("startJourney")}</button>
+        <a class="grab-link" href="${grabUrl}" target="_blank" rel="noreferrer">${t("openGrab")}</a>
+      </div>
     </div>
     <div class="metric-grid">
       <div class="metric"><strong>${duration} min</strong><span>${t("duration")}</span></div>
@@ -575,6 +606,7 @@ async function renderRoute() {
     </div>
     <p class="status">${t("dataNote")} ${t("liveNote")}</p>
   `;
+  document.querySelector("#startJourneyBtn")?.addEventListener("click", startJourney);
 }
 
 function distanceKm(a, b) {
@@ -629,6 +661,235 @@ function renderNearbyList() {
         .join("")}
     </div>
   `;
+}
+
+function stopLiveTracking() {
+  if (liveWatchId != null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(liveWatchId);
+  }
+  liveWatchId = null;
+}
+
+function stationCoords(station) {
+  return Number.isFinite(station?.lat) && Number.isFinite(station?.lng) ? [station.lat, station.lng] : null;
+}
+
+function journeyCoords() {
+  if (!currentJourney) return [];
+  const ids = [currentJourney.fromStation.id, ...currentJourney.legs.map((leg) => leg.to)];
+  const seen = new Set();
+  return ids
+    .filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .map((id) => stationCoords(stationById[id]))
+    .filter(Boolean);
+}
+
+function renderJourneySteps() {
+  if (!currentJourney) return;
+  const segments = navigationSegments();
+  els.journeySteps.innerHTML = segments.map(renderNavigationSegment).join("");
+}
+
+function coordParam(coord) {
+  return coord ? `${coord[0]},${coord[1]}` : "";
+}
+
+function mapLinksForSegment(segment) {
+  const destination = coordParam(segment.destination);
+  const origin = coordParam(segment.origin);
+  const destinationName = encodeURIComponent(segment.destinationName);
+  const googleParams = new URLSearchParams({
+    api: "1",
+    destination,
+    travelmode: segment.mode
+  });
+  if (origin) googleParams.set("origin", origin);
+
+  const appleParams = new URLSearchParams({
+    daddr: destination,
+    q: segment.destinationName,
+    dirflg: segment.mode === "transit" ? "r" : "w"
+  });
+  if (origin) appleParams.set("saddr", origin);
+
+  return {
+    google: `https://www.google.com/maps/dir/?${googleParams.toString()}`,
+    apple: `https://maps.apple.com/?${appleParams.toString()}`,
+    waze: `https://waze.com/ul?ll=${destination}&q=${destinationName}&navigate=yes`
+  };
+}
+
+function navigationSegments() {
+  const segments = [];
+  const firstStation = currentJourney.fromStation;
+  const firstStationCoord = stationCoords(firstStation);
+
+  if (firstStationCoord) {
+    segments.push({
+      title: t("firstMile"),
+      detail: `${t("walkOrGrab")} ${nearbyStationName(firstStation)}`,
+      origin: userLocation ? [userLocation.lat, userLocation.lng] : null,
+      destination: firstStationCoord,
+      destinationName: nearbyStationName(firstStation),
+      mode: "walking",
+      color: "#7f8c8d"
+    });
+  }
+
+  currentJourney.grouped.forEach((group) => {
+    const fromStation = stationById[group.from];
+    const toStation = stationById[group.to];
+    const line = lineById[group.lineId];
+    const destination = stationCoords(toStation);
+    if (!destination) return;
+    segments.push({
+      title: `${t("ride")} ${lineName(group.lineId)}`,
+      detail: `${stationName(fromStation)} - ${stationName(toStation)}`,
+      origin: stationCoords(fromStation),
+      destination,
+      destinationName: nearbyStationName(toStation),
+      mode: "transit",
+      color: line.color
+    });
+  });
+
+  return segments;
+}
+
+function renderNavigationSegment(segment) {
+  const links = mapLinksForSegment(segment);
+  return `
+    <div class="journey-step" style="border-color:${segment.color}">
+      <strong>${segment.title}</strong>
+      <span>${segment.detail}</span>
+      <div class="map-link-row">
+        <a class="map-link" href="${links.google}" target="_blank" rel="noreferrer">${t("openGoogleMaps")}</a>
+        <a class="map-link" href="${links.apple}" target="_blank" rel="noreferrer">${t("openAppleMaps")}</a>
+        <a class="map-link" href="${links.waze}" target="_blank" rel="noreferrer">${t("openWaze")}</a>
+      </div>
+    </div>
+  `;
+}
+
+function drawJourneyMap() {
+  if (!window.L) {
+    els.journeyStatus.textContent = t("mapUnavailable");
+    return;
+  }
+
+  const coords = journeyCoords();
+  if (!journeyMap) {
+    journeyMap = L.map(els.journeyMap, { zoomControl: false });
+    L.control.zoom({ position: "bottomright" }).addTo(journeyMap);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(journeyMap);
+  }
+
+  routeLayer?.remove();
+  stationLayer?.remove();
+  journeyBounds = null;
+  stationLayer = L.layerGroup().addTo(journeyMap);
+
+  coords.forEach((coord, index) => {
+    L.circleMarker(coord, {
+      radius: index === 0 || index === coords.length - 1 ? 8 : 5,
+      color: "#087f8c",
+      fillColor: "#ffffff",
+      fillOpacity: 1,
+      weight: 3
+    }).addTo(stationLayer);
+  });
+
+  if (coords.length > 1) {
+    routeLayer = L.polyline(coords, { color: "#087f8c", weight: 6, opacity: 0.85 }).addTo(journeyMap);
+    journeyBounds = routeLayer.getBounds();
+  } else if (coords.length === 1) {
+    journeyBounds = L.latLngBounds(coords);
+  }
+
+  fitJourneyMap();
+}
+
+function fitJourneyMap() {
+  if (!journeyMap) return;
+  journeyMap.invalidateSize(true);
+  if (journeyBounds?.isValid()) {
+    if (journeyBounds.getNorthEast().equals(journeyBounds.getSouthWest())) {
+      journeyMap.setView(journeyBounds.getCenter(), 14);
+    } else {
+      journeyMap.fitBounds(journeyBounds, { padding: [40, 40] });
+    }
+  }
+}
+
+function startLiveTracking() {
+  stopLiveTracking();
+  if (!navigator.geolocation || !window.isSecureContext) {
+    els.journeyStatus.textContent = t("liveTrackingUnavailable");
+    return;
+  }
+
+  liveWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      userLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      const coord = [userLocation.lat, userLocation.lng];
+      if (!liveMarker) {
+        liveMarker = L.circleMarker(coord, {
+          radius: 9,
+          color: "#ffffff",
+          fillColor: "#1a73e8",
+          fillOpacity: 1,
+          weight: 3
+        }).addTo(journeyMap);
+      } else {
+        liveMarker.setLatLng(coord);
+      }
+      els.journeyStatus.textContent = t("liveTracking");
+    },
+    () => {
+      els.journeyStatus.textContent = t("liveTrackingUnavailable");
+    },
+    { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+  );
+}
+
+function startJourney() {
+  if (!currentJourney) {
+    els.statusText.textContent = t("mapNeedsRoute");
+    return;
+  }
+  stopLiveTracking();
+  els.journeyTitle.textContent = `${stationName(currentJourney.fromStation)} - ${stationName(currentJourney.toStation)}`;
+  els.journeyView.classList.add("map-links");
+  els.journeyView.hidden = false;
+  els.journeyStatus.textContent = t("mapOpenHint");
+  els.journeyView.scrollIntoView({ behavior: "smooth", block: "start" });
+  renderJourneySteps();
+}
+
+function backToPlanner() {
+  stopLiveTracking();
+  els.journeyView.hidden = true;
+  els.journeyView.classList.remove("map-links");
+  els.results.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function recenterJourney() {
+  if (userLocation && journeyMap) {
+    journeyMap.setView([userLocation.lat, userLocation.lng], 16);
+    return;
+  }
+  const coords = journeyCoords();
+  if (coords.length > 1 && routeLayer) fitJourneyMap();
 }
 
 async function renderNearby() {
@@ -712,6 +973,8 @@ document.addEventListener("click", (event) => {
 
 els.routeBtn.addEventListener("click", renderRoute);
 els.nearbyBtn.addEventListener("click", renderNearby);
+els.backToPlannerBtn.addEventListener("click", backToPlanner);
+els.recenterBtn.addEventListener("click", recenterJourney);
 els.swapBtn.addEventListener("click", () => {
   const from = els.fromInput.value;
   els.fromInput.value = els.toInput.value;

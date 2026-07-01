@@ -8,6 +8,12 @@
       content="KL Path Guide helps people plan rail-first journeys around Kuala Lumpur and Klang Valley."
     />
     <title>KL Path Guide</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQzHnLYR4pT91BJlgyFhaM4e4h1g4R0="
+      crossorigin=""
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -58,6 +64,24 @@
 
         <section class="results" id="results" aria-live="polite"></section>
 
+        <section class="journey-view" id="journeyView" aria-labelledby="journeyTitle" hidden>
+          <div class="journey-panel">
+            <div class="journey-head">
+              <div>
+                <p class="eyebrow" data-i18n="liveJourney">Live journey</p>
+                <h2 id="journeyTitle">KL Path Guide</h2>
+              </div>
+              <button class="secondary" id="backToPlannerBtn" type="button" data-i18n="backToPlanner">Back</button>
+            </div>
+            <div class="journey-controls">
+              <button class="primary" id="recenterBtn" type="button" data-i18n="recenter">Recenter</button>
+            </div>
+            <p class="status" id="journeyStatus" role="status"></p>
+            <div class="journey-steps" id="journeySteps"></div>
+          </div>
+          <div class="journey-map" id="journeyMap"></div>
+        </section>
+
         <section class="rail-lines" aria-labelledby="linesTitle">
           <div class="section-head">
             <h2 id="linesTitle" data-i18n="includedLines">Included rail lines</h2>
@@ -69,6 +93,11 @@
       </main>
     </div>
 
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
     <script src="app.js"></script>
   </body>
 </html>
